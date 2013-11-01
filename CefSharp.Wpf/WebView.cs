@@ -118,7 +118,7 @@ namespace CefSharp.Wpf
             {
                 if (source != null)
                 {
-                    CreateOffscreenBrowser();
+                    CreateOffscreenBrowser(Address);
                 }
             }
         }
@@ -213,19 +213,33 @@ namespace CefSharp.Wpf
             ReloadCommand = new DelegateCommand(Reload, CanReload);
         }
 
-        private void OnApplicationExit(object sender, ExitEventArgs e)
+        public void Deactivate()
         {
+            RemoveSourceHook();
             ShutdownManagedCefBrowserAdapter();
+        }
 
-            Cef.Shutdown();
+        public void LoadUrl(string url)
+        {
+            Deactivate();
+
+            AddSourceHook();
+
+            CreateOffscreenBrowser(url);
+
+            Address = url;
+        }
+
+        private void OnApplicationExit(object sender, ExitEventArgs e)
+        {           
+            Deactivate();
         }
 
         public void OnUnloaded(object sender, RoutedEventArgs routedEventArgs)
         {
             // TODO: Will this really work correctly in a TabControl-based approach? (where we might get Loaded and Unloaded
             // multiple times)
-            RemoveSourceHook();
-            ShutdownManagedCefBrowserAdapter();
+            Deactivate();
         }
 
         private void ShutdownManagedCefBrowserAdapter()
@@ -244,26 +258,25 @@ namespace CefSharp.Wpf
         {
             base.OnApplyTemplate();
 
-            managedCefBrowserAdapter = new ManagedCefBrowserAdapter(this);
-
-            AddSourceHook();
-
-            if (Address != null)
-            {
-                CreateOffscreenBrowser();
-            }
-
-            Content = image = new Image();
-            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.NearestNeighbor);
-
+            image = new Image();
             image.Stretch = Stretch.None;
             image.HorizontalAlignment = HorizontalAlignment.Left;
             image.VerticalAlignment = VerticalAlignment.Top;
+
+            //RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.NearestNeighbor); 
+            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
+
+            Content = image;
         }
 
-        private void CreateOffscreenBrowser()
+        private void CreateOffscreenBrowser(string address)
         {
-            managedCefBrowserAdapter.CreateOffscreenBrowser(BrowserSettings ?? new BrowserSettings(), source.Handle, Address);
+            if (managedCefBrowserAdapter == null)
+            {
+                managedCefBrowserAdapter = new ManagedCefBrowserAdapter(this);
+            }
+
+            managedCefBrowserAdapter.CreateOffscreenBrowser(BrowserSettings ?? new BrowserSettings(), source.Handle, address);
             isOffscreenBrowserCreated = true;
         }
 
@@ -285,10 +298,10 @@ namespace CefSharp.Wpf
 
         private void RemoveSourceHook()
         {
-            if (source != null &&
-                sourceHook != null)
+            if (source != null && sourceHook != null)
             {
                 source.RemoveHook(sourceHook);
+                source = null;
             }
         }
 
@@ -334,10 +347,12 @@ namespace CefSharp.Wpf
             var newWidth = size.Width;
             var newHeight = size.Height;
 
-            if (newWidth > 0 &&
-                newHeight > 0)
+            if (newWidth > 0 && newHeight > 0)
             {
-                managedCefBrowserAdapter.WasResized();
+                if (managedCefBrowserAdapter != null)
+                {
+                    managedCefBrowserAdapter.WasResized();
+                }
             }
 
             return size;
@@ -454,7 +469,10 @@ namespace CefSharp.Wpf
 
         protected override void OnGotFocus(RoutedEventArgs e)
         {
-            managedCefBrowserAdapter.SendFocusEvent(true);
+            if (managedCefBrowserAdapter != null)
+            {
+                managedCefBrowserAdapter.SendFocusEvent(true);
+            }
 
             base.OnGotFocus(e);
         }
@@ -490,27 +508,36 @@ namespace CefSharp.Wpf
             {
                 var message = (int)(e.IsDown ? WM.KEYDOWN : WM.KEYUP);
                 var virtualKey = KeyInterop.VirtualKeyFromKey(e.Key);
-                managedCefBrowserAdapter.SendKeyEvent(message, virtualKey);
+                if (managedCefBrowserAdapter != null)
+                {
+                    managedCefBrowserAdapter.SendKeyEvent(message, virtualKey);
+                }
                 e.Handled = true;
             }
         }
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
-            var point = e.GetPosition(this);
-            managedCefBrowserAdapter.OnMouseMove((int)point.X, (int)point.Y, mouseLeave: false);
+            if (managedCefBrowserAdapter != null)
+            {
+                var point = e.GetPosition(this);
+                managedCefBrowserAdapter.OnMouseMove((int)point.X, (int)point.Y, mouseLeave: false);
+            }
         }
 
         protected override void OnMouseWheel(MouseWheelEventArgs e)
         {
-            var point = e.GetPosition(this);
+            if (managedCefBrowserAdapter != null)
+            {
+                var point = e.GetPosition(this);
 
-            managedCefBrowserAdapter.OnMouseWheel(
-                (int)point.X,
-                (int)point.Y,
-                deltaX: 0,
-                deltaY: e.Delta
-            );
+                managedCefBrowserAdapter.OnMouseWheel(
+                    (int)point.X,
+                    (int)point.Y,
+                    deltaX: 0,
+                    deltaY: e.Delta
+                );
+            }
         }
 
         protected override void OnMouseDown(MouseButtonEventArgs e)
@@ -528,35 +555,41 @@ namespace CefSharp.Wpf
 
         protected override void OnMouseLeave(MouseEventArgs e)
         {
-            managedCefBrowserAdapter.OnMouseMove(0, 0, mouseLeave: true);
+            if (managedCefBrowserAdapter != null)
+            {
+                managedCefBrowserAdapter.OnMouseMove(0, 0, mouseLeave: true);
+            }
         }
 
         private void OnMouseButton(MouseButtonEventArgs e)
         {
-            MouseButtonType mouseButtonType;
-
-            switch (e.ChangedButton)
+            if (managedCefBrowserAdapter != null)
             {
-                case MouseButton.Left:
-                    mouseButtonType = MouseButtonType.Left;
-                    break;
+                MouseButtonType mouseButtonType;
 
-                case MouseButton.Middle:
-                    mouseButtonType = MouseButtonType.Middle;
-                    break;
+                switch (e.ChangedButton)
+                {
+                    case MouseButton.Left:
+                        mouseButtonType = MouseButtonType.Left;
+                        break;
 
-                case MouseButton.Right:
-                    mouseButtonType = MouseButtonType.Right;
-                    break;
+                    case MouseButton.Middle:
+                        mouseButtonType = MouseButtonType.Middle;
+                        break;
 
-                default:
-                    return;
+                    case MouseButton.Right:
+                        mouseButtonType = MouseButtonType.Right;
+                        break;
+
+                    default:
+                        return;
+                }
+
+                var mouseUp = (e.ButtonState == MouseButtonState.Released);
+
+                var point = e.GetPosition(this);
+                managedCefBrowserAdapter.OnMouseButton((int)point.X, (int)point.Y, mouseButtonType, mouseUp, e.ClickCount);
             }
-
-            var mouseUp = (e.ButtonState == MouseButtonState.Released);
-
-            var point = e.GetPosition(this);
-            managedCefBrowserAdapter.OnMouseButton((int)point.X, (int)point.Y, mouseButtonType, mouseUp, e.ClickCount);
         }
 
         public void OnInitialized()
@@ -566,7 +599,10 @@ namespace CefSharp.Wpf
 
         public void LoadHtml(string html, string url)
         {
-            managedCefBrowserAdapter.LoadHtml(html, url);
+            if (managedCefBrowserAdapter != null)
+            {
+                managedCefBrowserAdapter.LoadHtml(html, url);
+            }
         }
 
         public void Stop()
@@ -576,7 +612,10 @@ namespace CefSharp.Wpf
 
         private void Back()
         {
-            managedCefBrowserAdapter.GoBack();
+            if (managedCefBrowserAdapter != null)
+            {
+                managedCefBrowserAdapter.GoBack();
+            }
         }
 
         private bool CanGoBack()
@@ -586,7 +625,10 @@ namespace CefSharp.Wpf
 
         private void Forward()
         {
-            managedCefBrowserAdapter.GoForward();
+            if (managedCefBrowserAdapter != null)
+            {
+                managedCefBrowserAdapter.GoForward();
+            }
         }
 
         private bool CanGoForward()
@@ -708,7 +750,10 @@ namespace CefSharp.Wpf
 
         public void ExecuteScript(string script)
         {
-            managedCefBrowserAdapter.ExecuteScript(script);
+            if (managedCefBrowserAdapter != null)
+            {
+                managedCefBrowserAdapter.ExecuteScript(script);
+            }
         }
 
         public object EvaluateScript(string script)
@@ -744,24 +789,27 @@ namespace CefSharp.Wpf
 
         public void SetBitmap()
         {
-            var bitmap = interopBitmap;
-
-            lock (managedCefBrowserAdapter.BitmapLock)
+            if (managedCefBrowserAdapter != null)
             {
-                if (bitmap == null)
+                var bitmap = interopBitmap;
+
+                lock (managedCefBrowserAdapter.BitmapLock)
                 {
-                    image.Source = null;
-                    GC.Collect(1);
+                    if (bitmap == null)
+                    {
+                        image.Source = null;
+                        GC.Collect(1);
 
-                    var stride = managedCefBrowserAdapter.BitmapWidth * BytesPerPixel;
+                        var stride = managedCefBrowserAdapter.BitmapWidth * BytesPerPixel;
 
-                    bitmap = (InteropBitmap)Imaging.CreateBitmapSourceFromMemorySection(FileMappingHandle,
-                        managedCefBrowserAdapter.BitmapWidth, managedCefBrowserAdapter.BitmapHeight, PixelFormat, stride, 0);
-                    image.Source = bitmap;
-                    interopBitmap = bitmap;
+                        bitmap = (InteropBitmap)Imaging.CreateBitmapSourceFromMemorySection(FileMappingHandle,
+                            managedCefBrowserAdapter.BitmapWidth, managedCefBrowserAdapter.BitmapHeight, PixelFormat, stride, 0);
+                        image.Source = bitmap;
+                        interopBitmap = bitmap;
+                    }
+
+                    interopBitmap.Invalidate();
                 }
-
-                interopBitmap.Invalidate();
             }
         }
 

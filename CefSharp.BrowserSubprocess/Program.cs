@@ -15,7 +15,7 @@ namespace CefSharp.BrowserSubprocess
         {
             var hInstance = Process.GetCurrentProcess().Handle;
             LogCommandLine(args);
-            MessageBox.Show("Please attach debugger now", null, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            //MessageBox.Show("Please attach debugger now", null, MessageBoxButtons.OK, MessageBoxIcon.Information);
 
             return ExecuteCefRenderProcess(hInstance);
         }
