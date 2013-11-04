@@ -28,8 +28,8 @@ namespace CefSharp.Wpf
         private bool isOffscreenBrowserCreated;
         private bool ignoreUriChange;
 
-        private Image image;
-        private InteropBitmap interopBitmap;
+        public Image Image;
+        public InteropBitmap InteropBitmap;
 
         public BrowserSettings BrowserSettings { get; set; }
         public bool IsBrowserInitialized { get; private set; }
@@ -225,7 +225,10 @@ namespace CefSharp.Wpf
 
             AddSourceHook();
 
-            CreateOffscreenBrowser(url);
+            if (source != null)
+            {
+                CreateOffscreenBrowser(url);
+            }
 
             Address = url;
         }
@@ -258,15 +261,15 @@ namespace CefSharp.Wpf
         {
             base.OnApplyTemplate();
 
-            image = new Image();
-            image.Stretch = Stretch.None;
-            image.HorizontalAlignment = HorizontalAlignment.Left;
-            image.VerticalAlignment = VerticalAlignment.Top;
+            Image = new Image();
+            Image.Stretch = Stretch.None;
+            Image.HorizontalAlignment = HorizontalAlignment.Left;
+            Image.VerticalAlignment = VerticalAlignment.Top;
 
             //RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.NearestNeighbor); 
-            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
+            RenderOptions.SetBitmapScalingMode(Image, BitmapScalingMode.HighQuality);
 
-            Content = image;
+            Content = Image;
         }
 
         private void CreateOffscreenBrowser(string address)
@@ -702,9 +705,16 @@ namespace CefSharp.Wpf
             throw new NotImplementedException();
         }
 
+        public event EventHandler FrameLoadStart;
+
         public void OnFrameLoadStart(string url)
         {
             browserCore.OnFrameLoadStart();
+
+            if (FrameLoadStart != null)
+            {
+                FrameLoadStart(this, new EventArgs());
+            }
         }
 
         public void OnFrameLoadEnd(string url)
@@ -784,31 +794,30 @@ namespace CefSharp.Wpf
 
         public void ClearBitmap()
         {
-            interopBitmap = null;
+            InteropBitmap = null;
         }
 
         public void SetBitmap()
         {
-            if (managedCefBrowserAdapter != null)
+            if (managedCefBrowserAdapter != null && managedCefBrowserAdapter.BitmapHeight > 0)
             {
-                var bitmap = interopBitmap;
+                var bitmap = InteropBitmap;
 
                 lock (managedCefBrowserAdapter.BitmapLock)
                 {
                     if (bitmap == null)
                     {
-                        image.Source = null;
+                        Image.Source = null;
                         GC.Collect(1);
 
                         var stride = managedCefBrowserAdapter.BitmapWidth * BytesPerPixel;
 
-                        bitmap = (InteropBitmap)Imaging.CreateBitmapSourceFromMemorySection(FileMappingHandle,
-                            managedCefBrowserAdapter.BitmapWidth, managedCefBrowserAdapter.BitmapHeight, PixelFormat, stride, 0);
-                        image.Source = bitmap;
-                        interopBitmap = bitmap;
+                        bitmap = (InteropBitmap)Imaging.CreateBitmapSourceFromMemorySection(FileMappingHandle, managedCefBrowserAdapter.BitmapWidth, managedCefBrowserAdapter.BitmapHeight, PixelFormat, stride, 0);
+                        Image.Source = bitmap;
+                        InteropBitmap = bitmap;
                     }
 
-                    interopBitmap.Invalidate();
+                    InteropBitmap.Invalidate();
                 }
             }
         }
