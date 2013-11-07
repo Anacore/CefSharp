@@ -613,7 +613,7 @@ namespace CefSharp.Wpf
             throw new NotImplementedException();
         }
 
-        private void Back()
+        public void Back()
         {
             if (managedCefBrowserAdapter != null)
             {
@@ -621,12 +621,12 @@ namespace CefSharp.Wpf
             }
         }
 
-        private bool CanGoBack()
+        public bool CanGoBack()
         {
             return browserCore.CanGoBack;
         }
 
-        private void Forward()
+        public void Forward()
         {
             if (managedCefBrowserAdapter != null)
             {
@@ -634,7 +634,7 @@ namespace CefSharp.Wpf
             }
         }
 
-        private bool CanGoForward()
+        public bool CanGoForward()
         {
             return browserCore.CanGoForward;
         }
